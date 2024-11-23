@@ -10,6 +10,10 @@ class SkillWheelScheme:
     self.levelX = levelX
     self.hierarchy = hierarchy
 
+  def __getitem__(self, key):
+    # print("Inside `__getitem__` method!")
+    return getattr(self, key)
+
   def get_categories_angle_ranges(self):
     angle_ranges = dict()
     n_categories = len(self.categories)
