@@ -3,10 +3,11 @@ import cv2
 import CsvInputLoader
 from SkillWheelPainter import SkillWheelPainter
 
-def generate_skill_wheel():
-    input_dir = 'Input'
-    print("Loading scheme from {} ...", input_dir)
-    scheme = CsvInputLoader.load_scheme(input_dir)
+
+def generate_skill_wheel(input_directory='Input-7'):
+
+    print("Loading scheme from {} ...", input_directory)
+    scheme = CsvInputLoader.load_scheme(input_directory)
     print('Scheme loaded!')
 
     angle_ranges = scheme.get_categories_angle_ranges()
@@ -19,9 +20,12 @@ def generate_skill_wheel():
     painter = SkillWheelPainter(scheme=scheme, image_size=2048)
     painter.paint()
     image = painter.get_image()
-    output_file = os.path.join(output_dir, 'image.png')
+    output_filename = os.path.basename(input_directory) + '_image.png'
+    output_file = os.path.join(output_dir, output_filename)
     cv2.imwrite(output_file, image)
 
 
 if __name__ == "__main__":
-    generate_skill_wheel()
+    # generate from example data
+    generate_skill_wheel('Input-7')
+    generate_skill_wheel('Input-8')
