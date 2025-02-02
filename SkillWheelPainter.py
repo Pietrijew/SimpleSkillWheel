@@ -17,7 +17,8 @@ class SkillWheelPainter:
         self.level1_radius = (self.radius + self.level12_radius) // 2
         self.level2_radius = (self.level12_radius + self.level23_radius) // 2
         self.level3_radius = (self.level23_radius + self.inner_radius) // 2
-        self.line_thickness = int(min(1., math.ceil(image_size/1000.)))
+        self.levelX_radius = int(round(0.75*self.inner_radius))
+        self.line_thickness = int(min(1, round(image_size/1000.)))
 
         self.background_color = (255, 255, 255)
         self.line_color = (0, 0, 0)
@@ -34,8 +35,8 @@ class SkillWheelPainter:
             color_level = int(127 + round(index * 128. / len(angle_ranges)-1))
             begin_angle = angle_range[0]
             end_angle   = angle_range[1]
-            begin_angle_deg = begin_angle * 180. / math.pi
-            end_angle_deg   = end_angle   * 180. / math.pi
+            begin_angle_deg = round(begin_angle * 180. / math.pi)
+            end_angle_deg   = round(end_angle   * 180. / math.pi)
             index += 1
             cv2.ellipse(
                 img=self.image,
@@ -48,9 +49,12 @@ class SkillWheelPainter:
                 thickness=-1,
                 lineType=cv2.LINE_AA
             )
+        for category, angle_range in angle_ranges.items():
+            # unfortunately cv2.ellipse seems to take only integer angle values :<
+            begin_angle =  round(angle_range[0]* 180. / math.pi) * math.pi/180.
             # draw line
-            x = int(math.floor(self.radius * math.cos(begin_angle)) + self.image_center[0])
-            y = int(math.floor(self.radius * math.sin(begin_angle)) + self.image_center[1]) # -sin ?
+            x = int(round(self.radius * math.cos(begin_angle)) + self.image_center[0])
+            y = int(round(self.radius * math.sin(begin_angle)) + self.image_center[1]) # -sin ?
             cv2.line(self.image, self.image_center, (x,y), self.line_color,
                      thickness=self.line_thickness, lineType=cv2.LINE_AA)
 
@@ -106,8 +110,46 @@ class SkillWheelPainter:
                     skill_positions[skill] = pos
                     continue
 
+        # try to draw level X in the middle (no idea how to do it better without hierarchy analysis)
+        n_x_skills = len(self.scheme.levelX)
+        if n_x_skills > 0:
+            x_angle_step = 2*math.pi / n_x_skills
+            for index, skill in enumerate(self.scheme.levelX):
+                angle = x_angle_step*index
+                x = int(math.floor(self.levelX_radius * math.cos(angle)) + self.image_center[0])
+                y = int(math.floor(self.levelX_radius * math.sin(angle)) + self.image_center[1])  # -sin ?
+                pos = (x, y)
 
-        # now draw the shit
+                # update dict
+                skill_positions[skill] = pos
+                continue
+
+        # draw hierarchy ! just simple arrows
+        for skill, dependencies in self.scheme.hierarchy.items():
+            skill_pos = skill_positions[skill]
+            for dep in dependencies:
+                dep_pos = skill_positions[dep]
+                # this is a bit more complicated
+                # because writing the arrow will be overwritten
+                # by skill interior in case of drawing the line from A to B
+                # so we need to calculate the end point on the skill's boundary
+
+                direction_vec = (skill_pos[0] - dep_pos[0],skill_pos[1] - dep_pos[1])
+                norm = math.sqrt(direction_vec[0]*direction_vec[0] + direction_vec[1]*direction_vec[1])
+                direction_vec = (direction_vec[0] / norm, direction_vec[1] / norm)
+                # after performing very ugly ops we finally have an unit vector
+                # now translate the end position by proper radius value in calculated direction
+                end_point = (int(round(skill_pos[0] - direction_vec[0] * self.skill_radius)),
+                             int(round(skill_pos[1] - direction_vec[1] * self.skill_radius)))
+                # calculate tip length in relation to line length
+                tip_length = 10. * self.line_thickness
+                tip_length_ratio = tip_length / (norm - self.skill_radius)
+
+                cv2.arrowedLine(self.image, dep_pos, end_point, self.line_color,
+                                thickness=self.line_thickness*2, line_type=cv2.LINE_AA,
+                                tipLength=tip_length_ratio)
+
+        # now draw the skills
         for skill, pos in skill_positions.items():
             # interior
             cv2.circle(self.image, pos, self.skill_radius, self.background_color, thickness=-1,
@@ -118,10 +160,15 @@ class SkillWheelPainter:
 
             x = pos[0]
             y = pos[1]
-            # text ?
-            text_pos = (x - self.skill_radius // 2, y + self.skill_radius // 4)
-            cv2.putText(self.image, skill, text_pos, self.font, 1., self.line_color,
+            # finally figured out how to center the text within the circle - DONE
+            text_size, base_line = cv2.getTextSize(skill,self.font, self.font_scale, self.line_thickness)
+
+            # text_pos = (x - self.skill_radius // 2, y + self.skill_radius // 4)
+            text_pos = (x - text_size[0] // 2, y + text_size[1] // 2)
+            cv2.putText(self.image, skill, text_pos, self.font, self.font_scale, self.line_color,
                         thickness=self.line_thickness, lineType=cv2.LINE_AA)
+
+
 
         return
 
