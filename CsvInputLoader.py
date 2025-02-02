@@ -1,5 +1,4 @@
 import os
-import os
 import pandas
 from SkillWheelScheme import SkillWheelScheme
 
