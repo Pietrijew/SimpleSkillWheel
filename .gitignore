@@ -186,3 +186,5 @@ fabric.properties
 
 # data output folder
 Output
+/Input-7/.~lock.*.csv#
+/Input-8/.~lock.*.csv#
